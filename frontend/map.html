@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>CyberSentinel – Attack Map</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+body{
+  background: radial-gradient(circle at top,#0a0f25,#020617);
+  color:white;
+  font-family:"Poppins";
+}
+
+body::after{
+  content:"CYBERSENTINEL";
+  position: fixed;
+  top:50%;
+  left:50%;
+  transform: translate(-50%,-50%) rotate(-18deg);
+  font-size: 120px;
+  color:#00ffee08;
+  font-weight: 900;
+  letter-spacing: 8px;
+  user-select:none;
+  pointer-events:none;
+}
+
+.navbar{
+  background:#000000c7;
+  border-bottom:1px solid #1f2937;
+}
+
+#map{
+  height:620px;
+  border-radius:12px;
+  border:1px solid #1f2937;
+  box-shadow:0 0 35px #00ffee22;
+}
+
+/* Corner watermark */
+.watermark{
+  position: fixed;
+  bottom: 12px;
+  right: 15px;
+  color: #00ffee99;
+  font-size: 14px;
+  letter-spacing: .6px;
+  font-weight: 600;
+  pointer-events: none;
+  user-select:none;
+}
+</style>
+</head>
+
+<body>
+
+<nav class="navbar px-4 py-3 d-flex justify-content-between">
+  <h3 class="fw-bold">🌍 CyberSentinel – Global Attack Map</h3>
+
+  <div>
+    <a href="index.html" class="btn btn-light btn-sm">Dashboard</a>
+    <a href="alerts.html" class="btn btn-danger btn-sm">Alerts</a>
+    <a href="logs.html" class="btn btn-secondary btn-sm">Logs</a>
+    <a href="map.html" class="btn btn-success btn-sm">Attack Map</a>
+  </div>
+</nav>
+
+<div class="container py-4">
+  <p class="text-muted">Showing live cyber threats detected via public threat intelligence feeds.</p>
+  <div id="map"></div>
+</div>
+
+<div class="watermark">⚡ Built by Sahil | CyberSentinel</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="assets/app.js"></script>
+
+<script>
+let map;
+let layer;
+
+function init(){
+  map = L.map("map").setView([20,0],2);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    maxZoom:7,
+    minZoom:2
+  }).addTo(map);
+
+  layer = L.layerGroup().addTo(map);
+}
+
+function render(events){
+  layer.clearLayers();
+
+  events.forEach(e=>{
+    if(!e.raw || !e.raw.location) return;
+    const {lat,lon,country,city} = e.raw.location;
+
+    L.circleMarker([lat,lon],{
+      radius:7,
+      color:"#00ffee",
+      fillColor:"#00ffee",
+      fillOpacity:0.6
+    }).bindPopup(`
+      <b>${country || "Unknown"}</b><br>
+      ${city || ""}<br>
+      IP: ${e.source_ip}<br>
+      Type: ${e.event_type}
+    `).addTo(layer);
+  });
+}
+
+async function refresh(){
+  const res = await fetch(`${API_BASE}/geo-events`);
+  const data = await res.json();
+  render(data);
+}
+
+init();
+refresh();
+setInterval(refresh,7000);
+</script>
+
+</body>
+</html>

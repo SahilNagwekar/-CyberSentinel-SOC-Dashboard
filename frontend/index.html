@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CyberSentinel – SOC Dashboard</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+
+  <style>
+
+    /* ------------------ BACKGROUND & GLOBAL ------------------ */
+    body {
+      background: radial-gradient(circle at top, #0a0f25, #020617);
+      color: white;
+      font-family: "Poppins", Arial, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Subtle background watermark */
+    body::after{
+      content:"CYBERSENTINEL";
+      position: fixed;
+      top:50%;
+      left:50%;
+      transform: translate(-50%,-50%) rotate(-18deg);
+      font-size: 120px;
+      color:#00ffee08;
+      font-weight: 900;
+      letter-spacing: 8px;
+      z-index:1;
+      user-select:none;
+      pointer-events:none;
+    }
+
+    /* ------------------ NAVBAR ------------------ */
+    .navbar {
+      background: #000000c7;
+      border-bottom: 1px solid #1f2937;
+      z-index: 999;
+    }
+
+    /* ------------------ STAT CARDS ------------------ */
+    .card {
+      background: linear-gradient(145deg, #0f172a, #020617);
+      border-radius: 16px;
+      border: 1px solid #1f2937;
+      box-shadow: 0 0 25px #00fff218;
+      transition: .3s ease;
+      position: relative;
+      z-index: 10;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 0 35px #00fff239;
+    }
+
+    .stat-title {
+      font-size: 14px;
+      letter-spacing: .6px;
+      color: #b5b5b5;
+    }
+
+    .stat-value {
+      font-size: 44px;
+      font-weight: 900;
+    }
+
+    .glow {
+      color: #00fff0;
+      text-shadow: 0 0 10px #00fff0, 0 0 30px #00fff077;
+    }
+
+    .pulse-alert {
+      color: #ff1744;
+      text-shadow: 0 0 20px #ff0022bb;
+      animation: pulse 1.2s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to   { transform: scale(1.06); }
+    }
+
+    /* ------------------ CHART BOX ------------------ */
+    .chart-box {
+      padding: 18px;
+      z-index:10;
+    }
+
+    /* ------------------ PERSONAL WATERMARK ------------------ */
+    .watermark{
+      position: fixed;
+      bottom: 12px;
+      right: 15px;
+      color: #00ffee99;
+      font-size: 14px;
+      letter-spacing: .6px;
+      font-weight: 600;
+      pointer-events: none;
+      user-select: none;
+      z-index: 9999;
+    }
+
+    .watermark:hover{
+      color:#00ffee;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- NAV -->
+<nav class="navbar px-4 py-3 d-flex justify-content-between align-items-center">
+  <h3 class="fw-bold">🛡 CyberSentinel – SOC Dashboard</h3>
+
+  <div>
+    <a href="index.html" class="btn btn-light btn-sm">Dashboard</a>
+    <a href="alerts.html" class="btn btn-danger btn-sm">Alerts</a>
+    <a href="logs.html" class="btn btn-secondary btn-sm">Logs</a>
+    <a href="map.html" class="btn btn-success btn-sm">Attack Map</a>
+  </div>
+</nav>
+
+
+<!-- CONTENT -->
+<div class="container py-4">
+
+  <div class="row g-4">
+
+      <div class="col-md-4">
+          <div class="card p-3">
+              <span class="stat-title">TOTAL LOG EVENTS</span>
+              <span class="stat-value glow" id="logCount">0</span>
+          </div>
+      </div>
+
+      <div class="col-md-4">
+          <div class="card p-3">
+              <span class="stat-title">TOTAL ALERTS</span>
+              <span class="stat-value text-warning" id="alertCount">0</span>
+          </div>
+      </div>
+
+      <div class="col-md-4">
+          <div class="card p-3">
+              <span class="stat-title">HIGH SEVERITY ALERTS</span>
+              <span class="stat-value text-danger" id="highCount">0</span>
+          </div>
+      </div>
+
+  </div>
+
+  <div class="card mt-4 chart-box">
+    <h5>Event Activity</h5>
+    <canvas id="eventsChart"></canvas>
+  </div>
+
+</div>
+
+
+<!-- Watermark -->
+<div class="watermark">
+  ⚡ Built by Sahil | CyberSentinel
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="assets/app.js"></script>
+
+<script>
+
+let eventsChart = null;
+
+/* ---------- Animated Numbers ---------- */
+function animateValue(id, start, end, duration = 600) {
+  const obj = document.getElementById(id);
+  let startTime = null;
+
+  function step(timestamp) {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      obj.innerText = Math.floor(progress * (end - start) + start);
+      if (progress < 1) window.requestAnimationFrame(step);
+  }
+
+  window.requestAnimationFrame(step);
+}
+
+
+/* ---------- Build Time Series ---------- */
+function buildTimeSeries(logs) {
+    const buckets = new Map();
+
+    logs.forEach(l => {
+        if (!l.timestamp) return;
+        const d = new Date(l.timestamp);
+        if (isNaN(d.getTime())) return;
+
+        const hh = d.getHours().toString().padStart(2, "0");
+        const mm = d.getMinutes().toString().padStart(2, "0");
+        const key = `${hh}:${mm}`;
+
+        buckets.set(key, (buckets.get(key) || 0) + 1);
+    });
+
+    return {
+      labels: Array.from(buckets.keys()),
+      data: Array.from(buckets.values())
+    };
+}
+
+
+/* ---------- Load Dashboard ---------- */
+async function loadDashboard() {
+    const stats = await fetchStats();
+    const logs = await fetchLogs();
+    const ctx = document.getElementById("eventsChart");
+
+    animateValue("logCount", Number(logCount.innerText), stats.logs);
+    animateValue("alertCount", Number(alertCount.innerText), stats.alerts);
+    animateValue("highCount", Number(highCount.innerText), stats.high_alerts);
+
+    // pulse alert
+    const high = document.getElementById("highCount");
+    if (stats.high_alerts > 0) high.classList.add("pulse-alert");
+    else high.classList.remove("pulse-alert");
+
+    const { labels, data } = buildTimeSeries(logs);
+
+    if (eventsChart) eventsChart.destroy();
+
+    eventsChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            label: "Events Per Minute",
+            data,
+            borderColor: "#00ffee",
+            backgroundColor: "#00ffee2e",
+            borderWidth: 3,
+            tension: .4,
+            fill: true
+          }]
+        },
+        options: {
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+    });
+}
+
+loadDashboard();
+setInterval(loadDashboard, 5000);
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,32 @@
+body {
+  background: #0f172a;
+  color: white;
+  font-family: Poppins, Arial;
+}
+
+.navbar {
+  background: #020617 !important;
+}
+
+.card {
+  background: #020617;
+  color: white;
+  border-radius: 12px;
+  border: 1px solid #1e293b;
+}
+
+.table {
+  color: white;
+}
+
+.badge-high {
+  background: red;
+}
+
+.badge-medium {
+  background: orange;
+}
+
+.badge-low {
+  background: green;
+}
